@@ -1,21 +1,25 @@
-use std::net::TcpListener;
-use std::env;
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+fn main() {
+    println!("Hello, world! This is web server");
+    // Start the server here
+    // 1. Load configuration from files
+    let config = load_config("config.toml");
+    println!("Loaded config: {}", config);
+    // 2. Set up TCP listener
+    // 3. Handle incoming connections
+    // for stream in listener.incoming() {
+    //     let stream = stream.unwrap();
+    //     handle_connection(stream);
+    // }
+}
 
-fn main() -> std::io::Result<()> {
-    let args: Vec<String> = env::args().collect();
-    let port = if args.len() > 1 {
-        &args[1]
-    } else {
-        "7878"
-    };
-
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", port))?;
-    println!("Listening on port {}", port);
-
-    for stream in listener.incoming() {
-        let stream = stream?;
-        println!("Connection established!");
-    }
-
-    Ok(())
+fn load_config(file_path: &str) -> String {
+    let path = Path::new(file_path);
+    let mut file = File::open(&path).expect("Unable to open config file");
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)
+        .expect("Unable to read config file");
+    contents
 }

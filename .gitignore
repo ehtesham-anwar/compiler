@@ -1,2 +1,6 @@
 /.DS_Store
 /.vscode/*
+
+# ignore build output
+/target/*
+!target/debug/deps/web_server*
