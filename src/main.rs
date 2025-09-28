@@ -27,9 +27,9 @@ fn main() {
             continue;
         }
         // run php script in that directory
-        // e,g /Users/ehteshamanwar/Desktop/test-app
+        // e,g /var/www/html
         // look for index.php or index.html
-        // if index.php run php-cgi -f /Users/ehteshamanwar/Desktop/test-app/index.php
+        // if index.php run php-cgi -f /var/www/html/index.php
         // if index.html serve that file
         // if neither serve 404
         let root_path = host_path.unwrap();
