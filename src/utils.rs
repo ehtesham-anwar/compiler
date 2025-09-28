@@ -36,7 +36,7 @@ pub struct HttpRequest {
     pub method: String,
     pub path: String,
     pub body: String,
-    pub user_agent: String
+    pub user_agent: String,
 }
 
 use std::net::TcpStream;
@@ -89,6 +89,6 @@ pub fn parse_request(stream: &TcpStream, peer: SocketAddr) -> HttpRequest {
         method,
         path,
         body,
-        user_agent
+        user_agent,
     }
 }

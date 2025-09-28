@@ -26,12 +26,14 @@ fn main() {
             stream.write_all(response.as_bytes()).unwrap();
             continue;
         }
+
         // run php script in that directory
         // e,g /var/www/html
         // look for index.php or index.html
         // if index.php run php-cgi -f /var/www/html/index.php
         // if index.html serve that file
         // if neither serve 404
+
         let root_path = host_path.unwrap();
         let index_php = format!("{}/index.php", root_path);
         let index_html = format!("{}/index.html", root_path);
@@ -43,7 +45,6 @@ fn main() {
                     .arg(&index_php)
                     .output()
                     .expect("failed to execute process");
-
                 let body = String::from_utf8_lossy(&output.stdout);
                 format!(
                     "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
