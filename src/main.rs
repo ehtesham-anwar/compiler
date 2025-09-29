@@ -2,12 +2,18 @@ mod utils;
 use std::io::Write;
 use std::net::TcpStream;
 use std::{collections::HashMap, net::TcpListener};
-use utils::HttpRequest;
 use utils::load_domains;
 use utils::parse_request;
+use utils::run_php_script;
+use utils::HttpRequest;
 
 fn main() {
-    let tcp_listener = TcpListener::bind("127.0.0.1:8080").unwrap();
+    // Allow configuring port via environment variable
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+    let bind_addr = format!("0.0.0.0:{}", port);
+
+    println!("Starting server on {}", bind_addr);
+    let tcp_listener = TcpListener::bind(&bind_addr).unwrap();
     let mut domain_map: HashMap<String, String> = HashMap::new();
     load_domains("config/domain.yml", &mut domain_map);
 
@@ -17,7 +23,10 @@ fn main() {
 
         let req: HttpRequest = parse_request(&stream, peer);
 
-        println!("Request: {} {} from {}", req.method, req.path, req.host);
+        println!(
+            "Request: {} {} from {} ({})",
+            req.method, req.path, req.host, req.client_ip
+        );
 
         let host_path = domain_map.get(&req.host);
 
@@ -37,21 +46,9 @@ fn main() {
         let root_path = host_path.unwrap();
         let index_php = format!("{}/index.php", root_path);
         let index_html = format!("{}/index.html", root_path);
+        println!("Serving from root path: {}", root_path);
         let response = match std::path::Path::new(&index_php).exists() {
-            true => {
-                // run php-cgi
-                let output = std::process::Command::new("php-cgi")
-                    .arg("-f")
-                    .arg(&index_php)
-                    .output()
-                    .expect("failed to execute process");
-                let body = String::from_utf8_lossy(&output.stdout);
-                format!(
-                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
-                    body.len(),
-                    body
-                )
-            }
+            true => run_php_script(&req, &index_php),
             false => match std::path::Path::new(&index_html).exists() {
                 true => {
                     let body = std::fs::read_to_string(&index_html).unwrap();
