@@ -120,47 +120,29 @@ pub fn run_php_script(request: &HttpRequest, script_path: &str) -> String {
         .env("GATEWAY_INTERFACE", "CGI/1.1")
         .stdin(std::process::Stdio::piped())
         .output();
-    println!("PHP output: {:?}", output);
     match output {
         Ok(result) => {
             if result.status.success() {
                 let php_output = String::from_utf8_lossy(&result.stdout);
-
-                // PHP CGI output includes headers, so we need to parse them
-                if php_output.contains("\r\n\r\n") {
-                    // Split headers and body
-                    let parts: Vec<&str> = php_output.splitn(2, "\r\n\r\n").collect();
-                    if parts.len() == 2 {
-                        let headers = parts[0];
-                        let body = parts[1];
-
-                        // Check if PHP already sent status header
-                        if headers.contains("Status:") {
-                            format!(
-                                "HTTP/1.1 {}\r\n{}\r\n\r\n{}",
-                                extract_status_from_headers(headers),
-                                headers.replace("Status:", ""),
-                                body
-                            )
-                        } else {
-                            format!("HTTP/1.1 200 OK\r\n{}\r\n\r\n{}", headers, body)
-                        }
-                    } else {
-                        format!(
-                            "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n{}",
-                            php_output
-                        )
-                    }
+                // Check if PHP output looks like it has headers already
+                if php_output.contains("Content-Type:") && php_output.contains("\r\n\r\n") {
+                    // PHP provided complete CGI response, just add HTTP status
+                    let response = format!("HTTP/1.1 200 OK\r\n{}", php_output);
+                    response
                 } else {
-                    // No headers, just content
-                    format!(
-                        "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n{}",
-                        php_output
-                    )
+                    // PHP output is just content, add our own headers
+                    let clean_output = php_output.trim();
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                        clean_output.len(),
+                        clean_output
+                    );
+                    response
                 }
             } else {
                 let error = String::from_utf8_lossy(&result.stderr);
                 let stdout = String::from_utf8_lossy(&result.stdout);
+                println!("❌ PHP Error - STDERR: {}, STDOUT: {}", error, stdout);
                 format!(
                     "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/html\r\n\r\n<h1>PHP Error</h1><pre>STDERR: {}\nSTDOUT: {}</pre>",
                     error, stdout
@@ -182,13 +164,4 @@ fn extract_query_string(path: &str) -> String {
     } else {
         String::new()
     }
-}
-
-fn extract_status_from_headers(headers: &str) -> String {
-    for line in headers.lines() {
-        if line.starts_with("Status:") {
-            return line["Status:".len()..].trim().to_string();
-        }
-    }
-    "200 OK".to_string()
 }

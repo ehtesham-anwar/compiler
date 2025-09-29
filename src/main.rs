@@ -13,7 +13,24 @@ fn main() {
     let bind_addr = format!("0.0.0.0:{}", port);
 
     println!("Starting server on {}", bind_addr);
-    let tcp_listener = TcpListener::bind(&bind_addr).unwrap();
+
+    // Try to bind to the port with better error handling
+    let tcp_listener = match TcpListener::bind(&bind_addr) {
+        Ok(listener) => {
+            println!("✅ Server successfully bound to {}", bind_addr);
+            listener
+        }
+        Err(e) => {
+            eprintln!("❌ Failed to bind to {}: {}", bind_addr, e);
+            eprintln!("💡 Try using a different port: PORT=8081 cargo run");
+            eprintln!(
+                "💡 Or kill the process using port {}: lsof -ti:{} | xargs kill -9",
+                port, port
+            );
+            std::process::exit(1);
+        }
+    };
+
     let mut domain_map: HashMap<String, String> = HashMap::new();
     load_domains("config/domain.yml", &mut domain_map);
 
@@ -46,19 +63,22 @@ fn main() {
         let root_path = host_path.unwrap();
         let index_php = format!("{}/index.php", root_path);
         let index_html = format!("{}/index.html", root_path);
-        println!("Serving from root path: {}", root_path);
         let response = match std::path::Path::new(&index_php).exists() {
-            true => run_php_script(&req, &index_php),
+            true => {
+                println!("📄 Found PHP file: {}", index_php);
+                let php_response = run_php_script(&req, &index_php);
+                php_response
+            }
             false => match std::path::Path::new(&index_html).exists() {
                 true => {
                     let body = std::fs::read_to_string(&index_html).unwrap();
                     format!(
-                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
+                        "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\n\r\n{}",
                         body.len(),
                         body
                     )
                 }
-                false => "HTTP/1.1 404 Not Found\r\n\r\n404 Not Found".to_string(),
+                false => "HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\n\r\n<h1>404 Not Found</h1>".to_string(),
             },
         };
         stream.write_all(response.as_bytes()).unwrap();
